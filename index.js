@@ -36,13 +36,11 @@ server.post('/api/login', (req, res) => {
     .first()
     .then(user => {
       if (user) {
-        if (bcrypt.compareSync(user.password, password)) {
-        res.status(200).json({ message: `Welcome ${user.username}!` });
+        if (user && bcrypt.compareSync(password, user.password)) {
+          res.status(200).json({ message: `Welcome ${user.username}!` });
         } else {
           res.status(401).json({ message: 'Invalid Credentials' });
         }
-      } else {
-        res.status(401).json({ message: 'Invalid Credentials' });
       }
     })
     .catch(error => {
@@ -50,7 +48,7 @@ server.post('/api/login', (req, res) => {
     });
 });
 
-server.get('/api/users', (req, res) => {
+server.get('/api/users', validateUser, (req, res) => {
   Users.find()
     .then(users => {
       res.json(users);
@@ -65,5 +63,39 @@ server.get('/hash', (req, res) => {
 
   res.send(`the hash for ${name} is ${hash}`)
 })
+
 const port = process.env.PORT || 5000;
 server.listen(port, () => console.log(`\n** Running on port ${port} **\n`));
+
+/* 
+write a middleware that will check for the username and password
+and let the request continue to /api/users if credentials are good
+return a 401 if the credentials are invalid
+
+use the middleware to restrict access to GET /api/users endpoint
+
+*/
+
+function validateUser(req, res, next) {
+  let { username, password } = req.body;
+
+  if (!username && !password) {
+    res.status(401).json({
+      message: 'Invalid Credentials'
+    })
+  } else (
+    Users.findBy({ username })
+    .first()
+    .then(user => {
+      if (user) {
+        if (user && bcrypt.compareSync(password, user.password)) {
+          next();
+        } else {
+          res.status(401).json({ message: 'Invalid Credentials' });
+        }
+      }
+    })
+    .catch(error => {
+      res.status(500).json(error);
+    }))
+}
